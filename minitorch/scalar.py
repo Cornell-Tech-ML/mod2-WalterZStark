@@ -112,21 +112,24 @@ class Scalar:
         return self.history is not None and self.history.last_fn is None
 
     def is_constant(self) -> bool:
+        """Checks if the current Scalar doesn't have a history and is therefore constant."""
         return self.history is None
 
     @property
     def parents(self) -> Iterable[Variable]:
-        """Get the variables used to create this one."""
+        """Returns parents of the current Scalar."""
         assert self.history is not None
         return self.history.inputs
 
     def chain_rule(self, d_output: Any) -> Iterable[Tuple[Variable, Any]]:
+        """Creates a chain rule given a Scalar and previous derivative output in backprop."""
         h = self.history
         assert h is not None
         assert h.last_fn is not None
         assert h.ctx is not None
-
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # Get previous gradient.
+        gradients = h.last_fn._backward(h.ctx, d_output)
+        return [(input_val, grad) for input_val, grad in zip(h.inputs, gradients)]
 
     def backward(self, d_output: Optional[float] = None) -> None:
         """Calls autodiff to fill in the derivatives for the history of this object.
@@ -141,17 +144,57 @@ class Scalar:
             d_output = 1.0
         backpropagate(self, d_output)
 
-    raise NotImplementedError("Need to include this file from past assignment.")
+    def __lt__(self, b: ScalarLike) -> Scalar:
+        """Checks whether a Scalar is less than a Scalarlike."""
+        return LT.apply(self, b)
+
+    def __gt__(self, b: ScalarLike) -> Scalar:
+        """Computes greater than for Scalar and a Scalarlike."""
+        return LT.apply(b, self)
+
+    def __sub__(self, b: ScalarLike) -> Scalar:
+        """Computes subtraction for a Scalarlike from a Scalar."""
+        return Add.apply(self, -b)
+
+    def __neg__(self) -> Scalar:
+        """Negates a Scalar."""
+        return Neg.apply(self)
+
+    def __add__(self, b: ScalarLike) -> Scalar:
+        """Computes the  addition of a Scalar and a Scalarlike."""
+        return Add.apply(self, b)
+
+    def __eq__(self, b: ScalarLike) -> Scalar:
+        """Checks whether a Scalar is equal to a Scalarlike."""
+        return EQ.apply(self, b)
+
+    def log(self) -> Scalar:
+        """Computes the log of a Scalar."""
+        return Log.apply(self)
+
+    def exp(self) -> Scalar:
+        """Computes the exponential function of a Scalar."""
+        return Exp.apply(self)
+
+    def sigmoid(self) -> Scalar:
+        """Computes the sigmoid function of a Scalar."""
+        return Sigmoid.apply(self)
+
+    def relu(self) -> Scalar:
+        """Computes the ReLU function of a Scalar."""
+        return ReLU.apply(self)
 
 
 def derivative_check(f: Any, *scalars: Scalar) -> None:
-    """Checks that autodiff works on a python function.
+    """Checks that autodiff works on a Python function.
     Asserts False if derivative is incorrect.
 
     Parameters
     ----------
-        f : function from n-scalars to 1-scalar.
-        *scalars  : n input scalar values.
+    f : Callable
+        A function that takes n scalar inputs and returns a single scalar output.
+    *scalars : Scalar
+        Variable number of input scalar values to be used as inputs to the function `f`.
 
     """
     out = f(*scalars)
